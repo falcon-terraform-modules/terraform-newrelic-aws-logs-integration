@@ -60,14 +60,46 @@ resource "aws_s3_bucket" "firehose" {
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "firehose" {
-  count  = var.firehose_bucket_expiration_days != null ? 1 : 0
+resource "aws_s3_bucket_versioning" "firehose" {
   bucket = aws_s3_bucket.firehose.bucket
-  rule {
-    id     = "expiration"
+  versioning_configuration {
     status = "Enabled"
-    expiration {
-      days = var.firehose_bucket_expiration_days
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "firehose" {
+  bucket = aws_s3_bucket.firehose.bucket
+  dynamic "rule" {
+    for_each = var.firehose_bucket_expiration_days != null ? [1] : []
+    content {
+      id     = "expiration"
+      status = "Enabled"
+      expiration {
+        days = var.firehose_bucket_expiration_days
+      }
+      noncurrent_version_expiration {
+        noncurrent_days = 1
+      }
+    }
+  }
+  dynamic "rule" {
+    for_each = [1]
+    content {
+      id     = "expiration_delete_markers"
+      status = "Enabled"
+      expiration {
+        expired_object_delete_marker = true
+      }
+    }
+  }
+  dynamic "rule" {
+    for_each = [1]
+    content {
+      id     = "abort_incomplete_multipart"
+      status = "Enabled"
+      abort_incomplete_multipart_upload {
+        days_after_initiation = 7
+      }
     }
   }
 }
